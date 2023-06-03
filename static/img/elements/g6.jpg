@@ -1,0 +1,1945 @@
+(widget.controller != null && oldWidget.controller == null)
+      _controller = null;
+    _effectiveFocusNode.canRequestFocus = _isEnabled;
+    if (_effectiveFocusNode.hasFocus && widget.readOnly != oldWidget.readOnly) {
+      if(_effectiveController.selection.isCollapsed) {
+        _showSelectionHandles = !widget.readOnly;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _focusNode?.dispose();
+    super.dispose();
+  }
+
+  EditableTextState get _editableText => editableTextKey.currentState;
+
+  void _requestKeyboard() {
+    _editableText?.requestKeyboard();
+  }
+
+  bool _shouldShowSelectionHandles(SelectionChangedCause cause) {
+    // When the text field is activated by something that doesn't trigger the
+    // selection overlay, we shouldn't show the handles either.
+    if (!_selectionGestureDetectorBuilder.shouldShowSelectionToolbar)
+      return false;
+
+    if (cause == SelectionChangedCause.keyboard)
+      return false;
+
+    if (widget.readOnly && _effectiveController.selection.isCollapsed)
+      return false;
+
+    if (cause == SelectionChangedCause.longPress)
+      return true;
+
+    if (_effectiveController.text.isNotEmpty)
+      return true;
+
+    return false;
+  }
+
+  void _handleSelectionChanged(TextSelection selection, SelectionChangedCause cause) {
+    final bool willShowSelectionHandles = _shouldShowSelectionHandles(cause);
+    if (willShowSelectionHandles != _showSelectionHandles) {
+      setState(() {
+        _showSelectionHandles = willShowSelectionHandles;
+      });
+    }
+
+    switch (Theme.of(context).platform) {
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+        if (cause == SelectionChangedCause.longPress) {
+          _editableText?.bringIntoView(selection.base);
+        }
+        return;
+      case TargetPlatform.android:
+      case TargetPlatform.fuchsia:
+      case TargetPlatform.linux:
+      case TargetPlatform.windows:
+        // Do nothing.
+    }
+  }
+
+  /// Toggle the toolbar when a selection handle is tapped.
+  void _handleSelectionHandleTapped() {
+    if (_effectiveController.selection.isCollapsed) {
+      _editableText.toggleToolbar();
+    }
+  }
+
+  void _handleHover(bool hovering) {
+    if (hovering != _isHovering) {
+      setState(() {
+        _isHovering = hovering;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    assert(debugCheckHasMaterial(context));
+    // TODO(jonahwilliams): uncomment out this check once we have migrated tests.
+    // assert(debugCheckHasMaterialLocalizations(context));
+    assert(debugCheckHasDirectionality(context));
+    assert(
+      !(widget.style != null && widget.style.inherit == false &&
+        (widget.style.fontSize == null || widget.style.textBaseline == null)),
+      'inherit false style must supply fontSize and textBaseline',
+    );
+
+    final ThemeData themeData = Theme.of(context);
+    final TextStyle style = themeData.textTheme.subtitle1.merge(widget.style);
+    final Brightness keyboardAppearance = widget.keyboardAppearance ?? themeData.primaryColorBrightness;
+    final TextEditingController controller = _effectiveController;
+    final FocusNode focusNode = _effectiveFocusNode;
+    final List<TextInputFormatter> formatters = widget.inputFormatters ?? <TextInputFormatter>[];
+    if (widget.maxLength != null && widget.maxLengthEnforced)
+      formatters.add(LengthLimitingTextInputFormatter(widget.maxLength));
+
+    TextSelectionControls textSelectionControls;
+    bool paintCursorAboveText;
+    bool cursorOpacityAnimates;
+    Offset cursorOffset;
+    Color cursorColor = widget.cursorColor;
+    Radius cursorRadius = widget.cursorRadius;
+
+    switch (themeData.platform) {
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+        forcePressEnabled = true;
+        textSelectionControls = cupertinoTextSelectionControls;
+        paintCursorAboveText = true;
+        cursorOpacityAnimates = true;
+        cursorColor ??= CupertinoTheme.of(context).primaryColor;
+        cursorRadius ??= const Radius.circular(2.0);
+        cursorOffset = Offset(iOSHorizontalOffset / MediaQuery.of(context).devicePixelRatio, 0);
+        break;
+
+      case TargetPlatform.android:
+      case TargetPlatform.fuchsia:
+      case TargetPlatform.linux:
+      case TargetPlatform.windows:
+        forcePressEnabled = false;
+        textSelectionControls = materialTextSelectionControls;
+        paintCursorAboveText = false;
+        cursorOpacityAnimates = false;
+        cursorColor ??= themeData.cursorColor;
+        break;
+    }
+
+    Widget child = RepaintBoundary(
+      child: EditableText(
+        key: editableTextKey,
+        readOnly: widget.readOnly,
+        toolbarOptions: widget.toolbarOptions,
+        showCursor: widget.showCursor,
+        showSelectionHandles: _showSelectionHandles,
+        controller: controller,
+        focusNode: focusNode,
+        keyboardType: widget.keyboardType,
+        textInputAction: widget.textInputAction,
+        textCapitalization: widget.textCapitalization,
+        style: style,
+        strutStyle: widget.strutStyle,
+        textAlign: widget.textAlign,
+        textDirection: widget.textDirection,
+        autofocus: widget.autofocus,
+        obscureText: widget.obscureText,
+        autocorrect: widget.autocorrect,
+        smartDashesType: widget.smartDashesType,
+        smartQuotesType: widget.smartQuotesType,
+        enableSuggestions: widget.enableSuggestions,
+        maxLines: widget.maxLines,
+        minLines: widget.minLines,
+        expands: widget.expands,
+        selectionColor: themeData.textSelectionColor,
+        selectionControls: widget.selectionEnabled ? textSelectionControls : null,
+        onChanged: widget.onChanged,
+        onSelectionChanged: _handleSelectionChanged,
+        onEditingComplete: widget.onEditingComplete,
+        onSubmitted: widget.onSubmitted,
+        onSelectionHandleTapped: _handleSelectionHandleTapped,
+        inputFormatters: formatters,
+        rendererIgnoresPointer: true,
+        cursorWidth: widget.cursorWidth,
+        cursorRadius: cursorRadius,
+        cursorColor: cursorColor,
+        selectionHeightStyle: widget.selectionHeightStyle,
+        selectionWidthStyle: widget.selectionWidthStyle,
+        cursorOpacityAnimates: cursorOpacityAnimates,
+        cursorOffset: cursorOffset,
+        paintCursorAboveText: paintCursorAboveText,
+        backgroundCursorColor: CupertinoColors.inactiveGray,
+        scrollPadding: widget.scrollPadding,
+        keyboardAppearance: keyboardAppearance,
+        enableInteractiveSelection: widget.enableInteractiveSelection,
+        dragStartBehavior: widget.dragStartBehavior,
+        scrollController: widget.scrollController,
+        scrollPhysics: widget.scrollPhysics,
+      ),
+    );
+
+    if (widget.decoration != null) {
+      child = AnimatedBuilder(
+        animation: Listenable.merge(<Listenable>[ focusNode, controller ]),
+        builder: (BuildContext context, Widget child) {
+          return InputDecorator(
+            decoration: _getEffectiveDecoration(),
+            baseStyle: widget.style,
+            textAlign: widget.textAlign,
+            textAlignVertical: widget.textAlignVertical,
+            isHovering: _isHovering,
+            isFocused: focusNode.hasFocus,
+            isEmpty: controller.value.text.isEmpty,
+            expands: widget.expands,
+            child: child,
+          );
+        },
+        child: child,
+      );
+    }
+    return IgnorePointer(
+      ignoring: !_isEnabled,
+      child: MouseRegion(
+        onEnter: (PointerEnterEvent event) => _handleHover(true),
+        onExit: (PointerExitEvent event) => _handleHover(false),
+        child: AnimatedBuilder(
+          animation: controller, // changes the _currentLength
+          builder: (BuildContext context, Widget child) {
+            return Semantics(
+              maxValueLength: widget.maxLengthEnforced && widget.maxLength != null && widget.maxLength > 0
+                  ? widget.maxLength
+                  : null,
+              currentValueLength: _currentLength,
+              onTap: () {
+                if (!_effectiveController.selection.isValid)
+                  _effectiveController.selection = TextSelection.collapsed(offset: _effectiveController.text.length);
+                _requestKeyboard();
+              },
+              child: child,
+            );
+          },
+          child: _selectionGestureDetectorBuilder.buildGestureDetector(
+            behavior: HitTestBehavior.translucent,
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+„O =K<**)(+) '9€ƒ:6+8 IOO_/& !7'D#5H&4"$,+5&&$&.F)5	.!&4"$L&&$&L	 &>&4"$,+5&&$&N2	#RQOM'FPOO-PRKNNQ5P%WCQRW$' 
+	OO 9Q(.*&1'#3'3<(#D2
+	MPLRMQAABP1PNLAv*-S7QPOQ0KLJLJCJFNOO7JIIP5MRROFN#IH0!8'$&&$$:867-#"#%%qq+4+'+.-22N5!>FWZg:  'I+3LFQ:9=OC=J$QOIH=CJQS5KEEQ%:%:BG*@03LQ8 7A.;&799;*;*=!6656)QI2(8L/&P?OOVFNO?SPRRLJIIOONQL'QONNHKLOMILOGNQ !7AGDA)?)9OH<+=3F)>&9:2L*K@1K?/'4S(;#H*=.<<4QRPQ'Q9KN/HA#IKQAGOF6.	R1;&>,7F,oaX|yY]a`€¨€¨lILYN€‰l€ˆeyfTdTt€ˆ€ƒvmi&WZ5"/'O;X9BQK/T4`6"K
+QY#K/-4+<8'&
+Q#" 	>#8,&2!,.cX*N.;8S%5	*!1`&.7/'DRI7R83	H'COAG2H3/XO>;+ "99$$"$=)7&&$!(-S=3BPD4PjD6c?K2 !-0# "#A&'B6b$$"$$@'(0%$0(6!,28(&.&**226$$"7T&66*@&'*%#<:7%5>.1H64.
+& M9"4&*:&,5&
+CB!@;l&3>w%I4
+,package:flutter/src/material/text_field.dartMfile:///C:/src/flutter/packages/flutter/lib/src/material/text_form_field.dart°È// Copyright 2014 The Flutter Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
+
+import 'input_decorator.dart';
+import 'text_field.dart';
+import 'theme.dart';
+
+export 'package:flutter/services.dart' show SmartQuotesType, SmartDashesType;
+
+/// A [FormField] that contains a [TextField].
+///
+/// This is a convenience widget that wraps a [TextField] widget in a
+/// [FormField].
+///
+/// A [Form] ancestor is not required. The [Form] simply makes it easier to
+/// save, reset, or validate multiple fields at once. To use without a [Form],
+/// pass a [GlobalKey] to the constructor and use [GlobalKey.currentState] to
+/// save or reset the form field.
+///
+/// When a [controller] is specified, its [TextEditingController.text]
+/// defines the [initialValue]. If this [FormField] is part of a scrolling
+/// container that lazily constructs its children, like a [ListView] or a
+/// [CustomScrollView], then a [controller] should be specified.
+/// The controller's lifetime should be managed by a stateful widget ancestor
+/// of the scrolling container.
+///
+/// If a [controller] is not specified, [initialValue] can be used to give
+/// the automatically generated controller an initial value.
+///
+/// Remember to [dispose] of the [TextEditingController] when it is no longer needed.
+/// This will ensure we discard any resources used by the object.
+///
+/// For a documentation about the various parameters, see [TextField].
+///
+/// {@tool snippet}
+///
+/// Creates a [TextFormField] with an [InputDecoration] and validator function.
+///
+/// ![If the user enters valid text, the TextField appears normally without any warnings to the user](https://flutter.github.io/assets-for-api-docs/assets/material/text_form_field.png)
+///
+/// ![If the user enters invalid text, the error message returned from the validator function is displayed in dark red underneath the input](https://flutter.github.io/assets-for-api-docs/assets/material/text_form_field_error.png)
+///
+/// ```dart
+/// TextFormField(
+///   decoration: const InputDecoration(
+///     icon: Icon(Icons.person),
+///     hintText: 'What do people call you?',
+///     labelText: 'Name *',
+///   ),
+///   onSaved: (String value) {
+///     // This optional block of code can be used to run
+///     // code when the user saves the form.
+///   },
+///   validator: (String value) {
+///     return value.contains('@') ? 'Do not use the @ char.' : null;
+///   },
+/// )
+/// ```
+/// {@end-tool}
+///
+/// {@tool dartpad --template=stateful_widget_material}
+/// This example shows how to move the focus to the next field when the user
+/// presses the ENTER key.
+///
+/// ```dart imports
+/// import 'package:flutter/services.dart';
+/// ```
+///
+/// ```dart
+/// Widget build(BuildContext context) {
+///   return Material(
+///     child: Center(
+///       child: Shortcuts(
+///         shortcuts: <LogicalKeySet, Intent>{
+///           // Pressing enter on the field will now move to the next field.
+///           LogicalKeySet(LogicalKeyboardKey.enter):
+///               Intent(NextFocusAction.key),
+///         },
+///         child: FocusTraversalGroup(
+///           child: Form(
+///             autovalidate: true,
+///             onChanged: () {
+///               Form.of(primaryFocus.context).save();
+///             },
+///             child: Wrap(
+///               children: List<Widget>.generate(5, (int index) {
+///                 return Padding(
+///                   padding: const EdgeInsets.all(8.0),
+///                   child: ConstrainedBox(
+///                     constraints: BoxConstraints.tight(Size(200, 50)),
+///                     child: TextFormField(
+///                       onSaved: (String value) {
+///                         print('Value for field $index saved as "$value"');
+///                       },
+///                     ),
+///                   ),
+///                 );
+///               }),
+///             ),
+///           ),
+///         ),
+///       ),
+///     ),
+///   );
+/// }
+/// ```
+/// {@end-tool}
+///
+/// See also:
+///
+///  * <https://material.io/design/components/text-fields.html>
+///  * [TextField], which is the underlying text field without the [Form]
+///    integration.
+///  * [InputDecorator], which shows the labels and other visual elements that
+///    surround the actual text editing widget.
+///  * Learn how to use a [TextEditingController] in one of our [cookbook recipe]s.(https://flutter.dev/docs/cookbook/forms/text-field-changes#2-use-a-texteditingcontroller)
+class TextFormField extends FormField<String> {
+  /// Creates a [FormField] that contains a [TextField].
+  ///
+  /// When a [controller] is specified, [initialValue] must be null (the
+  /// default). If [controller] is null, then a [TextEditingController]
+  /// will be constructed automatically and its `text` will be initialized
+  /// to [initialValue] or the empty string.
+  ///
+  /// For documentation about the various parameters, see the [TextField] class
+  /// and [new TextField], the constructor.
+  TextFormField({
+    Key key,
+    this.controller,
+    String initialValue,
+    FocusNode focusNode,
+    InputDecoration decoration = const InputDecoration(),
+    TextInputType keyboardType,
+    TextCapitalization textCapitalization = TextCapitalization.none,
+    TextInputAction textInputAction,
+    TextStyle style,
+    StrutStyle strutStyle,
+    TextDirection textDirection,
+    TextAlign textAlign = TextAlign.start,
+    TextAlignVertical textAlignVertical,
+    bool autofocus = false,
+    bool readOnly = false,
+    ToolbarOptions toolbarOptions,
+    bool showCursor,
+    bool obscureText = false,
+    bool autocorrect = true,
+    SmartDashesType smartDashesType,
+    SmartQuotesType smartQuotesType,
+    bool enableSuggestions = true,
+    bool autovalidate = false,
+    bool maxLengthEnforced = true,
+    int maxLines = 1,
+    int minLines,
+    bool expands = false,
+    int maxLength,
+    ValueChanged<String> onChanged,
+    GestureTapCallback onTap,
+    VoidCallback onEditingComplete,
+    ValueChanged<String> onFieldSubmitted,
+    FormFieldSetter<String> onSaved,
+    FormFieldValidator<String> validator,
+    List<TextInputFormatter> inputFormatters,
+    bool enabled = true,
+    double cursorWidth = 2.0,
+    Radius cursorRadius,
+    Color cursorColor,
+    Brightness keyboardAppearance,
+    EdgeInsets scrollPadding = const EdgeInsets.all(20.0),
+    bool enableInteractiveSelection = true,
+    InputCounterWidgetBuilder buildCounter,
+    ScrollPhysics scrollPhysics,
+  }) : assert(initialValue == null || controller == null),
+       assert(textAlign != null),
+       assert(autofocus != null),
+       assert(readOnly != null),
+       assert(obscureText != null),
+       assert(autocorrect != null),
+       assert(enableSuggestions != null),
+       assert(autovalidate != null),
+       assert(maxLengthEnforced != null),
+       assert(scrollPadding != null),
+       assert(maxLines == null || maxLines > 0),
+       assert(minLines == null || minLines > 0),
+       assert(
+         (maxLines == null) || (minLines == null) || (maxLines >= minLines),
+         "minLines can't be greater than maxLines",
+       ),
+       assert(expands != null),
+       assert(
+         !expands || (maxLines == null && minLines == null),
+         'minLines and maxLines must be null when expands is true.',
+       ),
+       assert(!obscureText || maxLines == 1, 'Obscured fields cannot be multiline.'),
+       assert(maxLength == null || maxLength > 0),
+       assert(enableInteractiveSelection != null),
+       super(
+    key: key,
+    initialValue: controller != null ? controller.text : (initialValue ?? ''),
+    onSaved: onSaved,
+    validator: validator,
+    autovalidate: autovalidate,
+    enabled: enabled,
+    builder: (FormFieldState<String> field) {
+      final _TextFormFieldState state = field as _TextFormFieldState;
+      final InputDecoration effectiveDecoration = (decoration ?? const InputDecoration())
+        .applyDefaults(Theme.of(field.context).inputDecorationTheme);
+      void onChangedHandler(String value) {
+        if (onChanged != null) {
+          onChanged(value);
+        }
+        field.didChange(value);
+      }
+      return TextField(
+        controller: state._effectiveController,
+        focusNode: focusNode,
+        decoration: effectiveDecoration.copyWith(errorText: field.errorText),
+        keyboardType: keyboardType,
+        textInputAction: textInputAction,
+        style: style,
+        strutStyle: strutStyle,
+        textAlign: textAlign,
+        textAlignVertical: textAlignVertical,
+        textDirection: textDirection,
+        textCapitalization: textCapitalization,
+        autofocus: autofocus,
+        toolbarOptions: toolbarOptions,
+        readOnly: readOnly,
+        showCursor: showCursor,
+        obscureText: obscureText,
+        autocorrect: autocorrect,
+        smartDashesType: smartDashesType ?? (obscureText ? SmartDashesType.disabled : SmartDashesType.enabled),
+        smartQuotesType: smartQuotesType ?? (obscureText ? SmartQuotesType.disabled : SmartQuotesType.enabled),
+        enableSuggestions: enableSuggestions,
+        maxLengthEnforced: maxLengthEnforced,
+        maxLines: maxLines,
+        minLines: minLines,
+        expands: expands,
+        maxLength: maxLength,
+        onChanged: onChangedHandler,
+        onTap: onTap,
+        onEditingComplete: onEditingComplete,
+        onSubmitted: onFieldSubmitted,
+        inputFormatters: inputFormatters,
+        enabled: enabled,
+        cursorWidth: cursorWidth,
+        cursorRadius: cursorRadius,
+        cursorColor: cursorColor,
+        scrollPadding: scrollPadding,
+        scrollPhysics: scrollPhysics,
+        keyboardAppearance: keyboardAppearance,
+        enableInteractiveSelection: enableInteractiveSelection,
+        buildCounter: buildCounter,
+      );
+    },
+  );
+
+  /// Controls the text being edited.
+  ///
+  /// If null, this widget will create its own [TextEditingController] and
+  /// initialize its [TextEditingController.text] with [initialValue].
+  final TextEditingController controller;
+
+  @override
+  _TextFormFieldState createState() => _TextFormFieldState();
+}
+
+class _TextFormFieldState extends FormFieldState<String> {
+  TextEditingController _controller;
+
+  TextEditingController get _effectiveController => widget.controller ?? _controller;
+
+  @override
+  TextFormField get widget => super.widget as TextFormField;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.controller == null) {
+      _controller = TextEditingController(text: widget.initialValue);
+    } else {
+      widget.controller.addListener(_handleControllerChanged);
+    }
+  }
+
+  @override
+  void didUpdateWidget(TextFormField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.controller != oldWidget.controller) {
+      oldWidget.controller?.removeListener(_handleControllerChanged);
+      widget.controller?.addListener(_handleControllerChanged);
+
+      if (oldWidget.controller != null && widget.controller == null)
+        _controller = TextEditingController.fromValue(oldWidget.controller.value);
+      if (widget.controller != null) {
+        setValue(widget.controller.text);
+        if (oldWidget.controller == null)
+          _controller = null;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller?.removeListener(_handleControllerChanged);
+    super.dispose();
+  }
+
+  @override
+  void reset() {
+    super.reset();
+    setState(() {
+      _effectiveController.text = widget.initialValue;
+    });
+  }
+
+  void _handleControllerChanged() {
+    // Suppress changes that originated from within this class.
+    //
+    // In the case where a controller has been passed in to this widget, we
+    // register this change listener. In these cases, we'll also receive change
+    // notifications for changes originating from within this class -- for
+    // example, the reset() method. In such cases, the FormField value will
+    // already have been set.
+    if (_effectiveController.text != value)
+      didChange(_effectiveController.text);
+  }
+}
+M =K)( O0GMPO#HLKBO!L>WCHQ€º€ç*#/
+!;/
+#G
+	9N-	*1O80)%!9D%;.K/5P
+	AKP1€¯1:JIL.Q-;!F&",*$&&$ $%%,&+/$<--"<##"%%+&+'22N5!>FW44P!/G[G-"!	1O%+!/'1)!##qq//&/(+#%#''1A%
+'LH+?<&W>&G@3'6GAFT(++	B8	%AMQLM--1package:flutter/src/material/text_form_field.dartLfile:///C:/src/flutter/packages/flutter/lib/src/material/text_selection.dartÀ eÍ// Copyright 2014 The Flutter Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+import 'dart:math' as math;
+
+import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:flutter/widgets.dart';
+
+import 'debug.dart';
+import 'flat_button.dart';
+import 'icon_button.dart';
+import 'icons.dart';
+import 'material.dart';
+import 'material_localizations.dart';
+import 'theme.dart';
+
+const double _kHandleSize = 22.0;
+
+// Minimal padding from all edges of the selection toolbar to all edges of the
+// viewport.
+const double _kToolbarScreenPadding = 8.0;
+const double _kToolbarHeight = 44.0;
+// Padding when positioning toolbar below selection.
+const double _kToolbarContentDistanceBelow = _kHandleSize - 2.0;
+const double _kToolbarContentDistance = 8.0;
+
+/// Manages a copy/paste text selection toolbar.
+class _TextSelectionToolbar extends StatefulWidget {
+  const _TextSelectionToolbar({
+    Key key,
+    this.handleCut,
+    this.handleCopy,
+    this.handlePaste,
+    this.handleSelectAll,
+    this.isAbove,
+  }) : super(key: key);
+
+  final VoidCallback handleCut;
+  final VoidCallback handleCopy;
+  final VoidCallback handlePaste;
+  final VoidCallback handleSelectAll;
+
+  // When true, the toolbar fits above its anchor and will be positioned there.
+  final bool isAbove;
+
+  @override
+  _TextSelectionToolbarState createState() => _TextSelectionToolbarState();
+}
+
+class _TextSelectionToolbarState extends State<_TextSelectionToolbar> with TickerProviderStateMixin {
+  // Whether or not the overflow menu is open. When it is closed, the menu
+  // items that don't overflow are shown. When it is open, only the overflowing
+  // menu items are shown.
+  bool _overflowOpen = false;
+
+  // The key for _TextSelectionToolbarContainer.
+  UniqueKey _containerKey = UniqueKey();
+
+  FlatButton _getItem(VoidCallback onPressed, String label) {
+    assert(onPressed != null);
+    return FlatButton(
+      child: Text(label),
+      onPressed: onPressed,
+    );
+  }
+
+  @override
+  void didUpdateWidget(_TextSelectionToolbar oldWidget) {
+    if (((widget.handleCut == null) != (oldWidget.handleCut == null))
+      || ((widget.handleCopy == null) != (oldWidget.handleCopy == null))
+      || ((widget.handlePaste == null) != (oldWidget.handlePaste == null))
+      || ((widget.handleSelectAll == null) != (oldWidget.handleSelectAll == null))) {
+      // Change _TextSelectionToolbarContainer's key when the menu changes in
+      // order to cause it to rebuild. This lets it recalculate its
+      // saved width for the new set of children, and it prevents AnimatedSize
+      // from animating the size change.
+      _containerKey = UniqueKey();
+      // If the menu items change, make sure the overflow menu is closed. This
+      // prevents an empty overflow menu.
+      _overflowOpen = false;
+    }
+    super.didUpdateWidget(oldWidget);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final MaterialLocalizations localizations = MaterialLocalizations.of(context);
+    final List<Widget> items = <Widget>[
+      if (widget.handleCut != null)
+        _getItem(widget.handleCut, localizations.cutButtonLabel),
+      if (widget.handleCopy != null)
+        _getItem(widget.handleCopy, localizations.copyButtonLabel),
+      if (widget.handlePaste != null)
+        _getItem(widget.handlePaste, localizations.pasteButtonLabel),
+      if (widget.handleSelectAll != null)
+        _getItem(widget.handleSelectAll, localizations.selectAllButtonLabel),
+    ];
+
+    // If there is no option available, build an empty widget.
+    if (items.isEmpty) {
+      return Container(width: 0.0, height: 0.0);
+    }
+
+
+    return _TextSelectionToolbarContainer(
+      key: _containerKey,
+      overflowOpen: _overflowOpen,
+      child: AnimatedSize(
+        vsync: this,
+        // This duration was eyeballed on a Pixel 2 emulator running Android
+        // API 28.
+        duration: const Duration(milliseconds: 140),
+        child: Material(
+          elevation: 1.0,
+          child: _TextSelectionToolbarItems(
+            isAbove: widget.isAbove,
+            overflowOpen: _overflowOpen,
+            children: <Widget>[
+              // The navButton that shows and hides the overflow menu is the
+              // first child.
+              Material(
+                child: IconButton(
+                  // TODO(justinmc): This should be an AnimatedIcon, but
+                  // AnimatedIcons doesn't yet support arrow_back to more_vert.
+                  // https://github.com/flutter/flutter/issues/51209
+                  icon: Icon(_overflowOpen ? Icons.arrow_back : Icons.more_vert),
+                  onPressed: () {
+                    setState(() {
+                      _overflowOpen = !_overflowOpen;
+                    });
+                  },
+                  tooltip: _overflowOpen
+                      ? localizations.backButtonTooltip
+                      : localizations.moreButtonTooltip,
+                ),
+              ),
+              ...items,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// When the overflow menu is open, it tries to align its right edge to the right
+// edge of the closed menu. This widget handles this effect by measuring and
+// maintaining the width of the closed menu and aligning the child to the right.
+class _TextSelectionToolbarContainer extends SingleChildRenderObjectWidget {
+  const _TextSelectionToolbarContainer({
+    Key key,
+    @required Widget child,
+    @required this.overflowOpen,
+  }) : assert(child != null),
+       assert(overflowOpen != null),
+       super(key: key, child: child);
+
+  final bool overflowOpen;
+
+  @override
+  _TextSelectionToolbarContainerRenderBox createRenderObject(BuildContext context) {
+    return _TextSelectionToolbarContainerRenderBox(overflowOpen: overflowOpen);
+  }
+
+  @override
+  void updateRenderObject(BuildContext context, _TextSelectionToolbarContainerRenderBox renderObject) {
+    renderObject.overflowOpen = overflowOpen;
+  }
+}
+
+class _TextSelectionToolbarContainerRenderBox extends RenderProxyBox {
+  _TextSelectionToolbarContainerRenderBox({
+    @required bool overflowOpen,
+  }) : assert(overflowOpen != null),
+       _overflowOpen = overflowOpen,
+       super();
+
+  // The width of the menu when it was closed. This is used to achieve the
+  // behavior where the open menu aligns its right edge to the closed menu's
+  // right edge.
+  double _closedWidth;
+
+  bool _overflowOpen;
+  bool get overflowOpen => _overflowOpen;
+  set overflowOpen(bool value) {
+    if (value == overflowOpen) {
+      return;
+    }
+    _overflowOpen = value;
+    markNeedsLayout();
+  }
+
+  @override
+  void performLayout() {
+    child.layout(constraints.loosen(), parentUsesSize: true);
+
+    // Save the width when the menu is closed. If the menu changes, this width
+    // is invalid, so it's important that this RenderBox be recreated in that
+    // case. Currently, this is achieved by providing a new key to
+    // _TextSelectionToolbarContainer.
+    if (!overflowOpen && _closedWidth == null) {
+      _closedWidth = child.size.width;
+    }
+
+    size = constraints.constrain(Size(
+      // If the open menu is wider than the closed menu, just use its own width
+      // and don't worry about aligning the right edges.
+      // _closedWidth is used even when the menu is closed to allow it to
+      // animate its size while keeping the same right alignment.
+      _closedWidth == null || child.size.width > _closedWidth ? child.size.width : _closedWidth,
+      child.size.height,
+    ));
+
+    final _ToolbarParentData childParentData = child.parentData as _ToolbarParentData;
+    childParentData.offset = Offset(
+      size.width - child.size.width,
+      0.0,
+    );
+  }
+
+  // Paint at the offset set in the parent data.
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final _ToolbarParentData childParentData = child.parentData as _ToolbarParentData;
+    context.paintChild(child, childParentData.offset + offset);
+  }
+
+  // Include the parent data offset in the hit test.
+  @override
+  bool hitTestChildren(BoxHitTestResult result, { Offset position }) {
+    // The x, y parameters have the top left of the node's box as the origin.
+    final _ToolbarParentData childParentData = child.parentData as _ToolbarParentData;
+    return result.addWithPaintOffset(
+      offset: childParentData.offset,
+      position: position,
+      hitTest: (BoxHitTestResult result, Offset transformed) {
+        assert(transformed == position - childParentData.offset);
+        return child.hitTest(result, position: transformed);
+      },
+    );
+  }
+
+  @override
+  void setupParentData(RenderBox child) {
+    if (child.parentData is! _ToolbarParentData) {
+      child.parentData = _ToolbarParentData();
+    }
+  }
+
+  @override
+  void applyPaintTransform(RenderObject child, Matrix4 transform) {
+    final _ToolbarParentData childParentData = child.parentData as _ToolbarParentData;
+    transform.translate(childParentData.offset.dx, childParentData.offset.dy);
+    super.applyPaintTransform(child, transform);
+  }
+}
+
+// Renders the menu items in the correct positions in the menu and its overflow
+// submenu based on calculating which item would first overflow.
+class _TextSelectionToolbarItems extends MultiChildRenderObjectWidget {
+  _TextSelectionToolbarItems({
+    Key key,
+    @required this.isAbove,
+    @required this.overflowOpen,
+    @required List<Widget> children,
+  }) : assert(children != null),
+       assert(isAbove != null),
+       assert(overflowOpen != null),
+       super(key: key, children: children);
+
+  final bool isAbove;
+  final bool overflowOpen;
+
+  @override
+  _TextSelectionToolbarItemsRenderBox createRenderObject(BuildContext context) {
+    return _TextSelectionToolbarItemsRenderBox(
+      isAbove: isAbove,
+      overflowOpen: overflowOpen,
+    );
+  }
+
+  @override
+  void updateRenderObject(BuildContext context, _TextSelectionToolbarItemsRenderBox renderObject) {
+    renderObject
+      ..isAbove = isAbove
+      ..overflowOpen = overflowOpen;
+  }
+
+  @override
+  _TextSelectionToolbarItemsElement createElement() => _TextSelectionToolbarItemsElement(this);
+}
+
+class _ToolbarParentData extends ContainerBoxParentData<RenderBox> {
+  /// Whether or not this child is painted.
+  ///
+  /// Children in the selection toolbar may be laid out for measurement purposes
+  /// but not painted. This allows these children to be identified.
+  bool shouldPaint;
+
+  @override
+  String toString() => '${super.toString()}; shouldPaint=$shouldPaint';
+}
+
+class _TextSelectionToolbarItemsElement extends MultiChildRenderObjectElement {
+  _TextSelectionToolbarItemsElement(
+    MultiChildRenderObjectWidget widget,
+  ) : super(widget);
+
+  static bool _shouldPaint(Element child) {
+    return (child.renderObject.parentData as _ToolbarParentData).shouldPaint;
+  }
+
+  @override
+  void debugVisitOnstageChildren(ElementVisitor visitor) {
+    children.where(_shouldPaint).forEach(visitor);
+  }
+}
+
+class _TextSelectionToolbarItemsRenderBox extends RenderBox with ContainerRenderObjectMixin<RenderBox, _ToolbarParentData> {
+  _TextSelectionToolbarItemsRenderBox({
+    @required bool isAbove,
+    @required bool overflowOpen,
+  }) : assert(overflowOpen != null),
+       assert(isAbove != null),
+       _isAbove = isAbove,
+       _overflowOpen = overflowOpen,
+       super();
+
+  // The index of the last item that doesn't overflow.
+  int _lastIndexThatFits = -1;
+
+  bool _isAbove;
+  bool get isAbove => _isAbove;
+  set isAbove(bool value) {
+    if (value == isAbove) {
+      return;
+    }
+    _isAbove = value;
+    markNeedsLayout();
+  }
+
+  bool _overflowOpen;
+  bool get overflowOpen => _overflowOpen;
+  set overflowOpen(bool value) {
+    if (value == overflowOpen) {
+      return;
+    }
+    _overflowOpen = value;
+    markNeedsLayout();
+  }
+
+  // Layout the necessary children, and figure out where the children first
+  // overflow, if at all.
+  void _layoutChildren() {
+    // When overflow is not open, the toolbar is always a specific height.
+    final BoxConstraints sizedConstraints = _overflowOpen
+      ? constraints
+      : BoxConstraints.loose(Size(
+          constraints.maxWidth,
+          _kToolbarHeight,
+        ));
+
+    int i = -1;
+    double width = 0.0;
+    visitChildren((RenderObject renderObjectChild) {
+      i++;
+
+      // No need to layout children inside the overflow menu when it's closed.
+      // The opposite is not true. It is necessary to layout the children that
+      // don't overflow when the overflow menu is open in order to calculate
+      // _lastIndexThatFits.
+      if (_lastIndexThatFits != -1 && !overflowOpen) {
+        return;
+      }
+
+      final RenderBox child = renderObjectChild as RenderBox;
+      child.layout(sizedConstraints.loosen(), parentUsesSize: true);
+      width += child.size.width;
+
+      if (width > sizedConstraints.maxWidth && _lastIndexThatFits == -1) {
+        _lastIndexThatFits = i - 1;
+      }
+    });
+
+    // If the last child overflows, but only because of the width of the
+    // overflow button, then just show it and hide the overflow button.
+    final RenderBox navButton = firstChild;
+    if (_lastIndexThatFits != -1
+        && _lastIndexThatFits == childCount - 2
+        && width - navButton.size.width <= sizedConstraints.maxWidth) {
+      _lastIndexThatFits = -1;
+    }
+  }
+
+  // Returns true when the child should be painted, false otherwise.
+  bool _shouldPaintChild(RenderObject renderObjectChild, int index) {
+    // Paint the navButton when there is overflow.
+    if (renderObjectChild == firstChild) {
+      return _lastIndexThatFits != -1;
+    }
+
+    // If there is no overflow, all children besides the navButton are painted.
+    if (_lastIndexThatFits == -1) {
+      return true;
+    }
+
+    // When there is overflow, paint if the child is in the part of the menu
+    // that is currently open. Overflowing children are painted when the
+    // overflow menu is open, and the children that fit are painted when the
+    // overflow menu is closed.
+    return (index > _lastIndexThatFits) == overflowOpen;
+  }
+
+  // Decide which children will be pained and set their shouldPaint, and set the
+  // offset that painted children will be placed at.
+  void _placeChildren() {
+    int i = -1;
+    Size nextSize = const Size(0.0, 0.0);
+    double fitWidth = 0.0;
+    final RenderBox navButton = firstChild;
+    double overflowHeight = overflowOpen && !isAbove ? navButton.size.height : 0.0;
+    visitChildren((RenderObject renderObjectChild) {
+      i++;
+
+      final RenderBox child = renderObjectChild as RenderBox;
+      final _ToolbarParentData childParentData = child.parentData as _ToolbarParentData;
+
+      // Handle placing the navigation button after iterating all children.
+      if (renderObjectChild == navButton) {
+        return;
+      }
+
+      // There is no need to place children that won't be painted.
+      if (!_shouldPaintChild(renderObjectChild, i)) {
+        childParentData.shouldPaint = false;
+        return;
+      }
+      childParentData.shouldPaint = true;
+
+      if (!overflowOpen) {
+        childParentData.offset = Offset(fitWidth, 0.0);
+        fitWidth += child.size.width;
+        nextSize = Size(
+          fitWidth,
+          math.max(child.size.height, nextSize.height),
+        );
+      } else {
+        childParentData.offset = Offset(0.0, overflowHeight);
+        overflowHeight += child.size.height;
+        nextSize = Size(
+          math.max(child.size.width, nextSize.width),
+          overflowHeight,
+        );
+      }
+    });
+
+    // Place the navigation button if needed.
+    final _ToolbarParentData navButtonParentData = navButton.parentData as _ToolbarParentData;
+    if (_shouldPaintChild(firstChild, 0)) {
+      navButtonParentData.shouldPaint = true;
+      if (overflowOpen) {
+        navButtonParentData.offset = isAbove
+          ? Offset(0.0, overflowHeight)
+          : Offset.zero;
+        nextSize = Size(
+          nextSize.width,
+          isAbove ? nextSize.height + navButton.size.height : nextSize.height,
+        );
+      } else {
+        navButtonParentData.offset = Offset(fitWidth, 0.0);
+        nextSize = Size(nextSize.width + navButton.size.width, nextSize.height);
+      }
+    } else {
+      navButtonParentData.shouldPaint = false;
+    }
+
+    size = nextSize;
+  }
+
+  @override
+  void performLayout() {
+    _lastIndexThatFits = -1;
+    if (firstChild == null) {
+      performResize();
+      return;
+    }
+
+    _layoutChildren();
+    _placeChildren();
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    visitChildren((RenderObject renderObjectChild) {
+      final RenderBox child = renderObjectChild as RenderBox;
+      final _ToolbarParentData childParentData = child.parentData as _ToolbarParentData;
+      if (!childParentData.shouldPaint) {
+        return;
+      }
+
+      context.paintChild(child, childParentData.offset + offset);
+    });
+  }
+
+  @override
+  void setupParentData(RenderBox child) {
+    if (child.parentData is! _ToolbarParentData) {
+      child.parentData = _ToolbarParentData();
+    }
+  }
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, { Offset position }) {
+    // The x, y parameters have the top left of the node's box as the origin.
+    RenderBox child = lastChild;
+    while (child != null) {
+      final _ToolbarParentData childParentData = child.parentData as _ToolbarParentData;
+
+      // Don't hit test children aren't shown.
+      if (!childParentData.shouldPaint) {
+        child = childParentData.previousSibling;
+        continue;
+      }
+
+      final bool isHit = result.addWithPaintOffset(
+        offset: childParentData.offset,
+        position: position,
+        hitTest: (BoxHitTestResult result, Offset transformed) {
+          assert(transformed == position - childParentData.offset);
+          return child.hitTest(result, position: transformed);
+        },
+      );
+      if (isHit)
+        return true;
+      child = childParentData.previousSibling;
+    }
+    return false;
+  }
+}
+
+/// Centers the toolbar around the given anchor, ensuring that it remains on
+/// screen.
+class _TextSelectionToolbarLayout extends SingleChildLayoutDelegate {
+  _TextSelectionToolbarLayout(this.anchor, this.upperBounds, this.fitsAbove);
+
+  /// Anchor position of the toolbar in global coordinates.
+  final Offset anchor;
+
+  /// The upper-most valid y value for the anchor.
+  final double upperBounds;
+
+  /// Whether the closed toolbar fits above the anchor position.
+  ///
+  /// If the closed toolbar doesn't fit, then the menu is rendered below the
+  /// anchor position. It should never happen that the toolbar extends below the
+  /// padded bottom of the screen.
+  ///
+  /// If the closed toolbar does fit but it doesn't fit when the overflow menu
+  /// is open, then the toolbar is still rendered above the anchor position. It
+  /// then grows downward, overlapping the selection.
+  final bool fitsAbove;
+
+  // Return the value that centers width as closely as possible to position
+  // while fitting inside of min and max.
+  static double _centerOn(double position, double width, double min, double max) {
+    // If it overflows on the left, put it as far left as possible.
+    if (position - width / 2.0 < min) {
+      return min;
+    }
+
+    // If it overflows on the right, put it as far right as possible.
+    if (position + width / 2.0 > max) {
+      return max - width;
+    }
+
+    // Otherwise it fits while perfectly centered.
+    return position - width / 2.0;
+  }
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) {
+    return constraints.loosen();
+  }
+
+  @override
+  Offset getPositionForChild(Size size, Size childSize) {
+    return Offset(
+      _centerOn(
+        anchor.dx,
+        childSize.width,
+        _kToolbarScreenPadding,
+        size.width - _kToolbarScreenPadding,
+      ),
+      fitsAbove
+        ? math.max(upperBounds, anchor.dy - childSize.height)
+        : anchor.dy,
+    );
+  }
+
+  @override
+  bool shouldRelayout(_TextSelectionToolbarLayout oldDelegate) {
+    return anchor != oldDelegate.anchor;
+  }
+}
+
+/// Draws a single text selection handle which points up and to the left.
+class _TextSelectionHandlePainter extends CustomPainter {
+  _TextSelectionHandlePainter({ this.color });
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint()..color = color;
+    final double radius = size.width/2.0;
+    final Rect circle = Rect.fromCircle(center: Offset(radius, radius), radius: radius);
+    final Rect point = Rect.fromLTWH(0.0, 0.0, radius, radius);
+    final Path path = Path()..addOval(circle)..addRect(point);
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_TextSelectionHandlePainter oldPainter) {
+    return color != oldPainter.color;
+  }
+}
+
+class _MaterialTextSelectionControls extends TextSelectionControls {
+  /// Returns the size of the Material handle.
+  @override
+  Size getHandleSize(double textLineHeight) => const Size(_kHandleSize, _kHandleSize);
+
+  /// Builder for material-style copy/paste text selection toolbar.
+  @override
+  Widget buildToolbar(
+    BuildContext context,
+    Rect globalEditableRegion,
+    double textLineHeight,
+    Offset selectionMidpoint,
+    List<TextSelectionPoint> endpoints,
+    TextSelectionDelegate delegate,
+  ) {
+    assert(debugCheckHasMediaQuery(context));
+    assert(debugCheckHasMaterialLocalizations(context));
+
+    // The toolbar should appear below the TextField when there is not enough
+    // space above the TextField to show it.
+    final TextSelectionPoint startTextSelectionPoint = endpoints[0];
+    final TextSelectionPoint endTextSelectionPoint = endpoints.length > 1
+      ? endpoints[1]
+      : endpoints[0];
+    const double closedToolbarHeightNeeded = _kToolbarScreenPadding
+      + _kToolbarHeight
+      + _kToolbarContentDistance;
+    final double paddingTop = MediaQuery.of(context).padding.top;
+    final double availableHeight = globalEditableRegion.top
+      + startTextSelectionPoint.point.dy
+      - textLineHeight
+      - paddingTop;
+    final bool fitsAbove = closedToolbarHeightNeeded <= availableHeight;
+    final Offset anchor = Offset(
+      globalEditableRegion.left + selectionMidpoint.dx,
+      fitsAbove
+        ? globalEditableRegion.top + startTextSelectionPoint.point.dy - textLineHeight - _kToolbarContentDistance
+        : globalEditableRegion.top + endTextSelectionPoint.point.dy + _kToolbarContentDistanceBelow,
+    );
+
+    return Stack(
+      children: <Widget>[
+        CustomSingleChildLayout(
+          delegate: _TextSelectionToolbarLayout(
+            anchor,
+            _kToolbarScreenPadding + paddingTop,
+            fitsAbove,
+          ),
+          child: _TextSelectionToolbar(
+            handleCut: canCut(delegate) ? () => handleCut(delegate) : null,
+            handleCopy: canCopy(delegate) ? () => handleCopy(delegate) : null,
+            handlePaste: canPaste(delegate) ? () => handlePaste(delegate) : null,
+            handleSelectAll: canSelectAll(delegate) ? () => handleSelectAll(delegate) : null,
+            isAbove: fitsAbove,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Builder for material-style text selection handles.
+  @override
+  Widget buildHandle(BuildContext context, TextSelectionHandleType type, double textHeight) {
+    final Widget handle = SizedBox(
+      width: _kHandleSize,
+      height: _kHandleSize,
+      child: CustomPaint(
+        painter: _TextSelectionHandlePainter(
+          color: Theme.of(context).textSelectionHandleColor,
+        ),
+      ),
+    );
+
+    // [handle] is a circle, with a rectangle in the top left quadrant of that
+    // circle (an onion pointing to 10:30). We rotate [handle] to point
+    // straight up or up-right depending on the handle type.
+    switch (type) {
+      case TextSelectionHandleType.left: // points up-right
+        return Transform.rotate(
+          angle: math.pi / 2.0,
+          child: handle,
+        );
+      case TextSelectionHandleType.right: // points up-left
+        return handle;
+      case TextSelectionHandleType.collapsed: // points up
+        return Transform.rotate(
+          angle: math.pi / 4.0,
+          child: handle,
+        );
+    }
+    assert(type != null);
+    return null;
+  }
+
+  /// Gets anchor for material-style text selection handles.
+  ///
+  /// See [TextSelectionControls.getHandleAnchor].
+  @override
+  Offset getHandleAnchor(TextSelectionHandleType type, double textLineHeight) {
+    switch (type) {
+      case TextSelectionHandleType.left:
+        return const Offset(_kHandleSize, 0);
+      case TextSelectionHandleType.right:
+        return Offset.zero;
+      default:
+        return const Offset(_kHandleSize / 2, -4);
+    }
+  }
+
+  @override
+  bool canSelectAll(TextSelectionDelegate delegate) {
+    // Android allows SelectAll when selection is not collapsed, unless
+    // everything has already been selected.
+    final TextEditingValue value = delegate.textEditingValue;
+    return delegate.selectAllEnabled &&
+           value.text.isNotEmpty &&
+           !(value.selection.start == 0 && value.selection.end == value.text.length);
+  }
+}
+
+/// Text selection controls that follow the Material Design specification.
+final TextSelectionControls materialTextSelectionControls = _MaterialTextSelectionControls();
+‚ñ =K**('#P,&6B.26!!"#'QMgLQ2*? ;GJLWOEP*$P+'(T*%C&E'G+O@2,$N6.&*!N$JQFS##7*9:
+RNRN*"&'VQi/H-"&&LN+""?POD(2((Q:KCb	X&&28XA6HOX''@C>
++40EXP2QBI "&"!&-R1#e&aF-REIQ&*-O<4~)"&!&8 !+""ML;$!6PPN8	?F"L%		JI-"1I FG4,(Q%NJN!:R6+-U6?ZM-	D7.	+9'9?.7		/`-/.)P=R	086?Z+	C	+40HO"Z0+2	5)BE@
+0NGO=4BNR$PQ7M+TE)G)4$G";!.
+?B*K;0*1+ZA@#@'F0XE )%/:O.FKE#C=*J#9sf"22)MPS_!
+:_%/>
+PI>="!=<"!>4Q*/+47I.?)%WL_0package:flutter/src/material/text_selection.dartHfile:///C:/src/flutter/packages/flutter/lib/src/material/text_theme.dartÀ x¢// Copyright 2014 The Flutter Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
+
+import 'typography.dart';
+
+// Eventually we'll get rid of the deprecated members, but for now, we have to use them
+// in order to implement them.
+// ignore_for_file: deprecated_member_use_from_same_package
+
+/// Material design text theme.
+///
+/// Definitions for the various typographical styles found in Material Design
+/// (e.g., button, caption). Rather than creating a [TextTheme] directly,
+/// you can obtain an instance as [Typography.black] or [Typography.white].
+///
+/// To obtain the current text theme, call [Theme.of] with the current
+/// [BuildContext] and read the [ThemeData.textTheme] property.
+///
+/// The names of the TextTheme properties match this table from the
+/// [Material Design spec](https://material.io/design/typography/the-type-system.html#type-scale)
+/// with two exceptions: the styles called H1-H6 in the spec are
+/// headline1-headline6 in the API, and body1,body2 are called
+/// bodyText1 and bodyText2.
+///
+/// ![](https://storage.googleapis.com/spec-host-backup/mio-design%2Fassets%2F1W8kyGVruuG_O8psvyiOaCf1lLFIMzB-N%2Ftypesystem-typescale.png)
+///
+/// ## Migrating from the 2014 names
+///
+/// The Material Design typography scheme was significantly changed in the
+/// current (2018) version of the specification
+/// (https://material.io/design/typography).
+///
+/// The 2018 spec has thirteen text styles:
+/// ```
+/// NAME         SIZE  WEIGHT  SPACING
+/// headline1    96.0  light   -1.5
+/// headline2    60.0  light   -0.5
+/// headline3    48.0  regular  0.0
+/// headline4    34.0  regular  0.25
+/// headline5    24.0  regular  0.0
+/// headline6    20.0  medium   0.15
+/// subtitle1    16.0  regular  0.15
+/// subtitle2    14.0  medium   0.1
+/// body1        16.0  regular  0.5   (bodyText1)
+/// body2        14.0  regular  0.25  (bodyText2)
+/// button       14.0  medium   1.25
+/// caption      12.0  regular  0.4
+/// overline     10.0  regular  1.5
+/// ```
+///
+/// ...where "light" is `FontWeight.w300`, "regular" is `FontWeight.w400` and
+/// "medium" is `FontWeight.w500`.
+///
+/// The [TextTheme] API was originally based on the original material (2014)
+/// design spec, which used different text style names. For backwards
+/// compatibility's sake, this API continues to expose the old names. The table
+/// below should help with understanding the mapping of the API's old names and
+/// the new names (those in terms of the 2018 material specification).
+///
+/// Each of the [TextTheme] text styles corresponds to one of the
+/// styles from 2018 spec. By default, the font sizes, font weights
+/// and letter spacings have not changed from their original,
+/// 2014, values.
+///
+/// ```
+/// NAME       SIZE   WEIGHT   SPACING  2018 NAME
+/// display4   112.0  thin     0.0      headline1
+/// display3   56.0   normal   0.0      headline2
+/// display2   45.0   normal   0.0      headline3
+/// display1   34.0   normal   0.0      headline4
+/// headline   24.0   normal   0.0      headline5
+/// title      20.0   medium   0.0      headline6
+/// subhead    16.0   normal   0.0      subtitle1
+/// body2      14.0   medium   0.0      body1 (bodyText1)
+/// body1      14.0   normal   0.0      body2 (bodyText2)
+/// caption    12.0   normal   0.0      caption
+/// button     14.0   medium   0.0      button
+/// subtitle   14.0   medium   0.0      subtitle2
+/// overline   10.0   normal   0.0      overline
+/// ```
+///
+/// Where "thin" is `FontWeight.w100`, "normal" is `FontWeight.w400` and
+/// "medium" is `FontWeight.w500`. Letter spacing for all of the original
+/// text styles was 0.0.
+///
+/// The old names are deprecated in this API.
+///
+/// Since the names `body1` and `body2` are used in both specifications but with
+/// different meanings, the API uses the terms `bodyText1` and `bodyText2` for
+/// the new API.
+///
+/// To configure a [Theme] for the new sizes, weights, and letter spacings,
+/// initialize its [ThemeData.typography] value using [Typography.material2018].
+///
+/// See also:
+///
+///  * [Typography], the class that generates [TextTheme]s appropriate for a platform.
+///  * [Theme], for other aspects of a material design application that can be
+///    globally adjusted, such as the color scheme.
+///  * <https://material.io/design/typography/>
+@immutable
+class TextTheme with Diagnosticable {
+  /// Creates a text theme that uses the given values.
+  ///
+  /// Rather than creating a new text theme, consider using [Typography.black]
+  /// or [Typography.white], which implement the typography styles in the
+  /// material design specification:
+  ///
+  /// <https://material.io/design/typography/#type-scale>
+  ///
+  /// If you do decide to create your own text theme, consider using one of
+  /// those predefined themes as a starting point for [copyWith] or [apply].
+  const TextTheme({
+    TextStyle headline1,
+    TextStyle headline2,
+    TextStyle headline3,
+    TextStyle headline4,
+    TextStyle headline5,
+    TextStyle headline6,
+    TextStyle subtitle1,
+    TextStyle subtitle2,
+    TextStyle bodyText1,
+    TextStyle bodyText2,
+    this.caption,
+    this.button,
+    this.overline,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is headline1. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle display4,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is headline2. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle display3,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is headline3. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle display2,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is headline4. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle display1,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is headline5. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle headline,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is headline6. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle title,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is subtitle1. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle subhead,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is subtitle2. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle subtitle,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is bodyText1. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle body2,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is bodyText2. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle body1,
+  }) : assert(
+         (headline1 == null && headline2 == null && headline3 == null && headline4 == null && headline5 == null && headline6 == null &&
+          subtitle1 == null && subtitle2 == null &&
+          bodyText1 == null && bodyText2 == null) ||
+         (display4 == null && display3 == null && display2 == null && display1 == null && headline == null && title == null &&
+          subhead == null && subtitle == null &&
+          body2 == null && body1 == null), 'Cannot mix 2014 and 2018 terms in call to TextTheme() constructor.'),
+       headline1 = headline1 ?? display4,
+       headline2 = headline2 ?? display3,
+       headline3 = headline3 ?? display2,
+       headline4 = headline4 ?? display1,
+       headline5 = headline5 ?? headline,
+       headline6 = headline6 ?? title,
+       subtitle1 = subtitle1 ?? subhead,
+       subtitle2 = subtitle2 ?? subtitle,
+       bodyText1 = bodyText1 ?? body2,
+       bodyText2 = bodyText2 ?? body1;
+
+  /// Extremely large text.
+  final TextStyle headline1;
+
+  /// Very, very large text.
+  ///
+  /// Used for the date in the dialog shown by [showDatePicker].
+  final TextStyle headline2;
+
+  /// Very large text.
+  final TextStyle headline3;
+
+  /// Large text.
+  final TextStyle headline4;
+
+  /// Used for large text in dialogs (e.g., the month and year in the dialog
+  /// shown by [showDatePicker]).
+  final TextStyle headline5;
+
+  /// Used for the primary text in app bars and dialogs (e.g., [AppBar.title]
+  /// and [AlertDialog.title]).
+  final TextStyle headline6;
+
+  /// Used for the primary text in lists (e.g., [ListTile.title]).
+  final TextStyle subtitle1;
+
+  /// For medium emphasis text that's a little smaller than [subtitle1].
+  final TextStyle subtitle2;
+
+  /// Used for emphasizing text that would otherwise be [bodyText2].
+  final TextStyle bodyText1;
+
+  /// The default text style for [Material].
+  final TextStyle bodyText2;
+
+  /// Used for auxiliary text associated with images.
+  final TextStyle caption;
+
+  /// Used for text on [RaisedButton] and [FlatButton].
+  final TextStyle button;
+
+  /// The smallest style.
+  ///
+  /// Typically used for captions or to introduce a (larger) headline.
+  final TextStyle overline;
+
+  /// Extremely large text.
+  ///
+  /// This was the name used in the material design 2014 specification. The new
+  /// specification calls this [headline1].
+  @Deprecated(
+    'This is the term used in the 2014 version of material design. The modern term is headline1. '
+    'This feature was deprecated after v1.13.8.'
+  )
+  TextStyle get display4 => headline1;
+
+  /// Very, very large text.
+  ///
+  /// This was the name used in the material design 2014 specification. The new
+  /// specification calls this [headline2].
+  @Deprecated(
+    'This is the term used in the 2014 version of material design. The modern term is headline2. '
+    'This feature was deprecated after v1.13.8.'
+  )
+  TextStyle get display3 => headline2;
+
+  /// Very large text.
+  ///
+  /// This was the name used in the material design 2014 specification. The new
+  /// specification calls this [headline3].
+  @Deprecated(
+    'This is the term used in the 2014 version of material design. The modern term is headline3. '
+    'This feature was deprecated after v1.13.8.'
+  )
+  TextStyle get display2 => headline3;
+
+  /// Large text.
+  ///
+  /// This was the name used in the material design 2014 specification. The new
+  /// specification calls this [headline4].
+  @Deprecated(
+    'This is the term used in the 2014 version of material design. The modern term is headline4. '
+    'This feature was deprecated after v1.13.8.'
+  )
+  TextStyle get display1 => headline4;
+
+  /// Used for large text in dialogs.
+  ///
+  /// This was the name used in the material design 2014 specification. The new
+  /// specification calls this [headline5].
+  @Deprecated(
+    'This is the term used in the 2014 version of material design. The modern term is headline5. '
+    'This feature was deprecated after v1.13.8.'
+  )
+  TextStyle get headline => headline5;
+
+  /// Used for the primary text in app bars and dialogs.
+  ///
+  /// This was the name used in the material design 2014 specification. The new
+  /// specification calls this [headline6].
+  @Deprecated(
+    'This is the term used in the 2014 version of material design. The modern term is headline6. '
+    'This feature was deprecated after v1.13.8.'
+  )
+  TextStyle get title => headline6;
+
+  /// Used for the primary text in lists (e.g., [ListTile.title]).
+  ///
+  /// This was the name used in the material design 2014 specification. The new
+  /// specification calls this [subtitle1].
+  @Deprecated(
+    'This is the term used in the 2014 version of material design. The modern term is subtitle1. '
+    'This feature was deprecated after v1.13.8.'
+  )
+  TextStyle get subhead => subtitle1;
+
+  /// For medium emphasis text that's a little smaller than [subhead].
+  ///
+  /// This was the name used in the material design 2014 specification. The new
+  /// specification calls this [subtitle2].
+  @Deprecated(
+    'This is the term used in the 2014 version of material design. The modern term is subtitle2. '
+    'This feature was deprecated after v1.13.8.'
+  )
+  TextStyle get subtitle => subtitle2;
+
+  /// Used for emphasizing text that would otherwise be [body1].
+  ///
+  /// This was the name used in the material design 2014 specification. The new
+  /// specification calls this `body1`, and it is exposed in this API as
+  /// [bodyText1].
+  @Deprecated(
+    'This is the term used in the 2014 version of material design. The modern term is bodyText1. '
+    'This feature was deprecated after v1.13.8.'
+  )
+  TextStyle get body2 => bodyText1;
+
+  /// Used for the default text style for [Material].
+  ///
+  /// This was the name used in the material design 2014 specification. The new
+  /// specification calls this `body2`, and it is exposed in this API as
+  /// [bodyText2].
+  @Deprecated(
+    'This is the term used in the 2014 version of material design. The modern term is bodyText2. '
+    'This feature was deprecated after v1.13.8.'
+  )
+  TextStyle get body1 => bodyText2;
+
+
+  /// Creates a copy of this text theme but with the given fields replaced with
+  /// the new values.
+  ///
+  /// Consider using [Typography.black] or [Typography.white], which implement
+  /// the typography styles in the material design specification, as a starting
+  /// point.
+  ///
+  /// {@tool snippet}
+  ///
+  /// ```dart
+  /// /// A Widget that sets the ambient theme's title text color for its
+  /// /// descendants, while leaving other ambient theme attributes alone.
+  /// class TitleColorThemeCopy extends StatelessWidget {
+  ///   TitleColorThemeCopy({Key key, this.child, this.titleColor}) : super(key: key);
+  ///
+  ///   final Color titleColor;
+  ///   final Widget child;
+  ///
+  ///   @override
+  ///   Widget build(BuildContext context) {
+  ///     final ThemeData theme = Theme.of(context);
+  ///     return Theme(
+  ///       data: theme.copyWith(
+  ///         textTheme: theme.textTheme.copyWith(
+  ///           headline6: theme.textTheme.headline6.copyWith(
+  ///             color: titleColor,
+  ///           ),
+  ///         ),
+  ///       ),
+  ///       child: child,
+  ///     );
+  ///   }
+  /// }
+  /// ```
+  /// {@end-tool}
+  ///
+  /// See also:
+  ///
+  ///  * [merge] is used instead of [copyWith] when you want to merge all
+  ///    of the fields of a TextTheme instead of individual fields.
+  TextTheme copyWith({
+    TextStyle headline1,
+    TextStyle headline2,
+    TextStyle headline3,
+    TextStyle headline4,
+    TextStyle headline5,
+    TextStyle headline6,
+    TextStyle subtitle1,
+    TextStyle subtitle2,
+    TextStyle bodyText1,
+    TextStyle bodyText2,
+    TextStyle caption,
+    TextStyle button,
+    TextStyle overline,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is headline1. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle display4,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is headline2. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle display3,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is headline3. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle display2,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is headline4. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle display1,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is headline5. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle headline,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is headline6. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle title,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is subtitle1. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle subhead,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is subtitle2. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle subtitle,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is bodyText1. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle body2,
+    @Deprecated(
+      'This is the term used in the 2014 version of material design. The modern term is bodyText2. '
+      'This feature was deprecated after v1.13.8.'
+    )
+    TextStyle body1,
+  }) {
+    assert(
+      (headline1 == null && headline2 == null && headline3 == null && headline4 == null && headline5 == null && headline6 == null &&
+       subtitle1 == null && subtitle2 == null &&
+       bodyText1 == null && bodyText2 == null) ||
+      (display4 == null && display3 == null && display2 == null && display1 == null && headline == null && title == null &&
+       subhead == null && subtitle == null &&
+       body2 == null && body1 == null), 'Cannot mix 2014 and 2018 terms in call to TextTheme.copyWith().');
+    return TextTheme(
+      headline1: headline1 ?? display4 ?? this.headline1,
+      headline2: headline2 ?? display3 ?? this.headline2,
+      headline3: headline3 ?? display2 ?? this.headline3,
+      headline4: headline4 ?? display1 ?? this.headline4,
+      headline5: headline5 ?? headline ?? this.headline5,
+      headline6: headline6 ?? title ?? this.headline6,
+      subtitle1: subtitle1 ?? subhead ?? this.subtitle1,
+      subtitle2: subtitle2 ?? subtitle ?? this.subtitle2,
+      bodyText1: bodyText1 ?? body2 ?? this.bodyText1,
+      bodyText2: bodyText2 ?? body1 ?? this.bodyText2,
+      caption: caption ?? this.caption,
+      button: button ?? this.button,
+      overline: overline ?? this.overline,
+    );
+  }
+
+  /// Creates a new [TextTheme] where each text style from this object has been
+  /// merged with the matching text style from the `other` object.
+  ///
+  /// The merging is done by calling [TextStyle.merge] on each respective pair
+  /// of text styles from this and the [other] text themes and is subject to
+  /// the value of [TextStyle.inherit] flag. For more details, see the
+  /// documentation on [TextStyle.merge] and [TextStyle.inherit].
+  ///
+  /// If this theme, or the `other` theme has members that are null, then the
+  /// non-null one (if any) is used. If the `other` theme is itself null, then
+  /// this [TextTheme] is returned unchanged. If values in both are set, then
+  /// the values are merged using [TextStyle.merge].
+  ///
+  /// This is particularly useful if one [TextTheme] defines one set of
+  /// properties and another defines a different set, e.g. having colors
+  /// defined in one text theme and font sizes in another, or when one
+  /// [TextTheme] has only some fields defined, and you want to define the rest
+  /// by merging it with a default theme.
+  ///
+  /// {@tool snippet}
+  ///
+  /// ```dart
+  /// /// A Widget that sets the ambient theme's title text color for its
+  /// /// descendants, while leaving other ambient theme attributes alone.
+  /// class TitleColorTheme extends StatelessWidget {
+  ///   TitleColorTheme({Key key, this.child, this.titleColor}) : super(key: key);
+  ///
+  ///   final Color titleColor;
+  ///   final Widget child;
+  ///
+  ///   @override
+  ///   Widget build(BuildContext context) {
+  ///     ThemeData theme = Theme.of(context);
+  ///     // This partialTheme is incomplete: it only has the title style
+  ///     // defined. Just replacing theme.textTheme with partialTheme would
+  ///     // set the title, but everything else would be null. This isn't very
+  ///     // useful, so merge it with the existing theme to keep all of the
+  ///     // preexisting definitions for the other styles.
+  ///     TextTheme partialTheme = TextTheme(headline6: TextStyle(color: titleColor));
+  ///     theme = theme.copyWith(textTheme: theme.textTheme.merge(partialTheme));
+  ///     return Theme(data: theme, child: child);
+  ///   }
+  /// }
+  /// ```
+  /// {@end-tool}
+  ///
+  /// See also:
+  ///
+  ///  * [copyWith] is used instead of [merge] when you wish to override
+  ///    individual fields in the [TextTheme] instead of merging all of the
+  ///    fields of two [TextTheme]s.
+  TextTheme merge(TextTheme other) {
+    if (other == null)
+      return this;
+    return copyWith(
+      headline1: headline1?.merge(other.headline1) ?? other.headline1,
+      headline2: headline2?.merge(other.headline2) ?? other.headline2,
+      headline3: headline3?.merge(other.headline3) ?? other.headline3,
+      headline4: headline4?.merge(other.headline4) ?? other.headline4,
+      headline5: headline5?.merge(other.headline5) ?? other.headline5,
+      headline6: headline6?.merge(other.headline6) ?? other.headline6,
+      subtitle1: subtitle1?.merge(other.subtitle1) ?? other.subtitle1,
+      subtitle2: subtitle2?.merge(other.subtitle2) ?? other.subtitle2,
+      bodyText1: bodyText1?.merge(other.bodyText1) ?? other.bodyText1,
+      bodyText2: bodyText2?.merge(other.bodyText2) ?? other.bodyText2,
+      caption: caption?.merge(other.caption) ?? other.caption,
+      button: button?.merge(other.button) ?? other.button,
+      overline: overline?.merge(other.overline) ?? other.overline,
+    );
+  }
+
+  /// Creates a copy of this text theme but with the given field replaced in
+  /// each of the individual text styles.
+  ///
+  /// The `displayColor` is applied to [headline4], [headline3], [headline2],
+  /// [headline1], and [caption]. The `bodyColor` is applied to the remaining
+  /// text styles.
+  ///
+  /// Consider using [Typography.black] or [Typography.white], which implement
+  /// the typography styles in the material design specification, as a starting
+  /// point.
+  TextTheme apply({
+    String fontFamily,
+    double fontSizeFactor = 1.0,
+    double fontSizeDelta = 0.0,
+    Color displayColor,
+    Color bodyColor,
+    TextDecoration decoration,
+    Color decorationColor,
+    TextDecorationStyle decorationStyle,
+  }) {
+    return TextTheme(
+      headline1: headline1?.apply(
+        color: displayColor,
+        decoration: decoration,
+        decorationColor: decorationColor,
+        decorationStyle: decorationStyle,
+        fontFamily: fontFamily,
+        fontSizeFactor: fontSizeFactor,
+        fontSizeDelta: fontSizeDelta,
+      ),
+      headline2: headline2?.apply(
+        color: displayColor,
+        decoration: decoration,
+        decorationColor: decorationColor,
+        decorationStyle: decorationStyle,
+        fontFamily: fontFamily,
+        fontSizeFactor: fontSizeFactor,
+        fontSizeDelta: fontSizeDelta,
+      ),
+      headline3: headline3?.apply(
+        color: displayColor,
+        decoration: decoration,
+        decorationColor: decorationColor,
+        decorationStyle: decorationStyle,
+        fontFamily: fontFamily,
+        fontSizeFactor: fontSizeFactor,
+        fontSizeDelta: fontSizeDelta,
+      ),
+      headline4: headline4?.apply(
+        color: displayColor,
+        decoration: decoration,
+        decorationColor: decorationColor,
+        decorationStyle: decorationStyle,
+        fontFamily: fontFamily,
+        fontSizeFactor: fontSizeFactor,
+        fontSizeDelta: fontSizeDelta,
+      ),
+      headline5: headline5?.apply(
+        color: bodyColor,
+        decoration: decoration,
+        decorationColor: decorationColor,
+        decorationStyle: decorationStyle,
+        fontFamily: fontFamily,
+        fontSizeFactor: fontSizeFactor,
+        fontSizeDe

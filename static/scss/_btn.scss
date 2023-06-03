@@ -1,0 +1,99 @@
+ndColor != null),
+       assert(dialogBackgroundColor != null),
+       assert(indicatorColor != null),
+       assert(hintColor != null),
+       assert(errorColor != null),
+       assert(textTheme != null),
+       assert(primaryTextTheme != null),
+       assert(accentTextTheme != null),
+       assert(inputDecorationTheme != null),
+       assert(iconTheme != null),
+       assert(primaryIconTheme != null),
+       assert(accentIconTheme != null),
+       assert(sliderTheme != null),
+       assert(tabBarTheme != null),
+       assert(tooltipTheme != null),
+       assert(cardTheme != null),
+       assert(chipTheme != null),
+       assert(platform != null),
+       assert(materialTapTargetSize != null),
+       assert(pageTransitionsTheme != null),
+       assert(appBarTheme != null),
+       assert(bottomAppBarTheme != null),
+       assert(colorScheme != null),
+       assert(dialogTheme != null),
+       assert(floatingActionButtonTheme != null),
+       assert(navigationRailTheme != null),
+       assert(typography != null),
+       assert(snackBarTheme != null),
+       assert(bottomSheetTheme != null),
+       assert(popupMenuTheme != null),
+       assert(bannerTheme != null),
+       assert(dividerTheme != null),
+       assert(buttonBarTheme != null);
+
+  /// Create a [ThemeData] based on the colors in the given [colorScheme] and
+  /// text styles of the optional [textTheme].
+  ///
+  /// The [colorScheme] can not be null.
+  ///
+  /// If [colorScheme.brightness] is [Brightness.dark] then
+  /// [ThemeData.applyElevationOverlayColor] will be set to true to support
+  /// the Material dark theme method for indicating elevation by applying
+  /// a semi-transparent onSurface color on top of the surface color.
+  ///
+  /// This is the recommended method to theme your application. As we move
+  /// forward we will be converting all the widget implementations to only use
+  /// colors or colors derived from those in [ColorScheme].
+  ///
+  /// {@tool snippet}
+  /// This example will set up an application to use the baseline Material
+  /// Design light and dark themes.
+  ///
+  /// ```dart
+  /// MaterialApp(
+  ///   theme: ThemeData.from(colorScheme: ColorScheme.light()),
+  ///   darkTheme: ThemeData.from(colorScheme: ColorScheme.dark()),
+  /// )
+  /// ```
+  /// {@end-tool}
+  ///
+  /// See <https://material.io/design/color/> for
+  /// more discussion on how to pick the right colors.
+  factory ThemeData.from({
+    @required ColorScheme colorScheme,
+    TextTheme textTheme,
+  }) {
+    assert(colorScheme != null);
+
+    final bool isDark = colorScheme.brightness == Brightness.dark;
+
+    // For surfaces that use primary color in light themes and surface color in dark
+    final Color primarySurfaceColor = isDark ? colorScheme.surface : colorScheme.primary;
+    final Color onPrimarySurfaceColor = isDark ? colorScheme.onSurface : colorScheme.onPrimary;
+
+    return ThemeData(
+      brightness: colorScheme.brightness,
+      primaryColor: primarySurfaceColor,
+      primaryColorBrightness: ThemeData.estimateBrightnessForColor(primarySurfaceColor),
+      canvasColor: colorScheme.background,
+      accentColor: colorScheme.secondary,
+      accentColorBrightness: ThemeData.estimateBrightnessForColor(colorScheme.secondary),
+      scaffoldBackgroundColor: colorScheme.background,
+      bottomAppBarColor: colorScheme.surface,
+      cardColor: colorScheme.surface,
+      dividerColor: colorScheme.onSurface.withOpacity(0.12),
+      backgroundColor: colorScheme.background,
+      dialogBackgroundColor: colorScheme.background,
+      errorColor: colorScheme.error,
+      textTheme: textTheme,
+      indicatorColor: onPrimarySurfaceColor,
+      applyElevationOverlayColor: isDark,
+      colorScheme: colorScheme,
+    );
+  }
+
+  /// A default light blue theme.
+  ///
+  /// This theme does not contain text geometry. Instead, it is expected that
+  /// this theme is localized using text geometry 
